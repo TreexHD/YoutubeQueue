@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Video Queue</title>
+  <style>
+    :root {
+      --bg: #f9f9f9;
+      --accent: #ff4d4d;
+      --primary: #007bff;
+      --text: #333;
+      --card-bg: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+    }
+
+    h1, h2 {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.05);
+    }
+
+    form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 16px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .danger {
+      background-color: var(--accent);
+    }
+
+    .danger:hover {
+      background-color: #cc0000;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .video-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      background: #fafafa;
+      margin-bottom: 10px;
+    }
+
+    #loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.5rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YouTube Video Queue</h1>
+
+    <h3 id="currently-playing" style="margin-bottom: 1rem; color: #555;">Currently Playing: <span id="now-playing-title">None</span></h3>
+
+    <div id="loading-overlay">Please wait...</div>
+
+    <form id="add-video-form">
+      <input type="text" id="video-url" placeholder="Enter YouTube URL" required />
+      <button type="submit">Add</button>
+    </form>
+
+    <h2>Queue</h2>
+    <ul id="video-queue"></ul>
+
+    <div class="actions">
+      <button id="play-next">▶️ Play Next</button>
+      <button id="start-browser">🧭 Start Browser</button>
+    </div>
+  </div>
+
+  <script>
+    const overlay = document.getElementById('loading-overlay');
+
+    function showLoading() {
+      overlay.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      overlay.style.display = 'none';
+    }
+
+    async function updateQueue() {
+      const res = await fetch('/get_queue');
+      const data = await res.json();
+      const queue = data.queue;
+      const current = data.currently_playing;
+
+      const queueElement = document.getElementById('video-queue');
+      const nowPlaying = document.getElementById('now-playing-title');
+
+      queueElement.innerHTML = '';
+      nowPlaying.textContent = current ? `${current.title} (${current.uploader})` : 'None';
+
+      queue.forEach((video, index) => {
+        const item = document.createElement('li');
+        item.className = 'video-item';
+        item.innerHTML = `
+          <span>${video.title} (${video.uploader})</span>
+          <button class="danger" onclick="deleteVideo(${index})">🗑️</button>
+        `;
+        queueElement.appendChild(item);
+      });
+    }
+
+    async function deleteVideo(index) {
+      showLoading();
+      const res = await fetch(`/delete_video/${index}`, { method: 'DELETE' });
+      const result = await res.json();
+      hideLoading();
+      if (result.status === 'success') {
+        updateQueue();
+      } else {
+        alert(result.message);
+      }
+    }
+
+    document.getElementById('add-video-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showLoading();
+
+      const url = document.getElementById('video-url').value;
+      const response = await fetch('/add_video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `url=${encodeURIComponent(url)}`
+      });
+
+      const result = await response.json();
+      hideLoading();
+
+      if (result.status === 'success') {
+        alert(`Added: ${result.title}`);
+        document.getElementById('video-url').value = '';
+        updateQueue();
+      } else {
+        alert(`Error: ${result.message}`);
+      }
+    });
+
+    document.getElementById('play-next').addEventListener('click', async () => {
+      showLoading();
+      const response = await fetch('/play_next_video', { method: 'POST' });
+      const result = await response.json();
+      hideLoading();
+
+      if (result.status === 'success') {
+        alert(`Now playing: ${result.title}`);
+        updateQueue();
+      } else {
+        alert(`Error: ${result.message}`);
+      }
+    });
+
+    document.getElementById('start-browser').addEventListener('click', async () => {
+      showLoading();
+      const response = await fetch('/start_browser');
+      const result = await response.json();
+      hideLoading();
+
+      alert(result.message);
+    });
+
+    updateQueue();
+  </script>
+</body>
+</html>
