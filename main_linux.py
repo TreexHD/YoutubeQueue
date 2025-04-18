@@ -9,8 +9,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
 
-# use python 3.10 or 3.11 not never !!!!!!!!!!!!!!!!!!!
-
 app = Flask(__name__)
 
 video_queue = []
@@ -75,10 +73,17 @@ def index():
 @app.route('/add_video', methods=['POST'])
 def add_video():
     video_url = request.form['url']
+    node = request.form.get('node', '').strip()
+
     if video_url:
         title, uploader = get_video_details(video_url)
         if title and uploader:
-            video_queue.append({'url': video_url, 'title': title, 'uploader': uploader})
+            video_queue.append({
+                'url': video_url,
+                'title': title,
+                'uploader': uploader,
+                'node': node
+            })
             return jsonify({'status': 'success', 'title': title, 'uploader': uploader})
         else:
             return jsonify({'status': 'error', 'message': 'Failed to fetch video details'})
