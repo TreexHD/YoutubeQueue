@@ -68,10 +68,17 @@ def index():
 @app.route('/add_video', methods=['POST'])
 def add_video():
     video_url = request.form['url']
+    node = request.form.get('node', '').strip()
+
     if video_url:
         title, uploader = get_video_details(video_url)
         if title and uploader:
-            video_queue.append({'url': video_url, 'title': title, 'uploader': uploader})
+            video_queue.append({
+                'url': video_url,
+                'title': title,
+                'uploader': uploader,
+                'node': node
+            })
             return jsonify({'status': 'success', 'title': title, 'uploader': uploader})
         else:
             return jsonify({'status': 'error', 'message': 'Failed to fetch video details'})
